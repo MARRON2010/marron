@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>美容室POS v1.46</title>
+    <title>美容室POS v1.46 (Login-free)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet"/>
@@ -24,10 +24,9 @@
 <div id="app">
     <div id="lock-screen" class="fixed inset-0 z-[100] bg-background-dark flex items-center justify-center p-6 hidden">
         <div class="w-full max-w-xs space-y-6 text-center">
-            <span class="material-symbols-outlined text-primary text-6xl">lock</span>
-            <h2 class="text-xl font-black text-primary uppercase tracking-widest">Login Required</h2>
-            <input id="app-password" type="password" placeholder="パスワードを入力" class="w-full bg-neutral-dark border border-white/10 rounded-xl px-4 py-4 text-center text-white outline-none focus:border-primary" />
-            <button onclick="checkAppLock()" class="w-full py-4 gold-gradient rounded-xl text-background-dark font-bold active:scale-95">ロック解除</button>
+            <span class="material-symbols-outlined text-primary text-6xl">lock_open</span>
+            <h2 class="text-xl font-black text-primary uppercase tracking-widest">Login Free Mode</h2>
+            <button onclick="document.getElementById('lock-screen').classList.add('hidden'); renderMain();" class="w-full py-4 gold-gradient rounded-xl text-background-dark font-bold active:scale-95">アプリを開始</button>
         </div>
     </div>
 
@@ -38,14 +37,11 @@
                 <h1 class="text-xl font-extrabold tracking-widest text-primary uppercase" id="display-salon-name">Luxe Salon</h1>
             </div>
             <div class="flex gap-2">
-                <button onclick="logout()" class="w-10 h-10 rounded-full flex items-center justify-center bg-red-500/10 border border-red-500/30 active:scale-90" title="ロックアウト">
-                    <span class="material-symbols-outlined text-red-400 text-xl">logout</span>
+                <button onclick="switchScreen('settings')" class="w-10 h-10 rounded-full flex items-center justify-center bg-neutral-dark premium-border active:scale-90">
+                    <span class="material-symbols-outlined text-primary">settings</span>
                 </button>
                 <button onclick="openHistoryWithAuth()" class="w-10 h-10 rounded-full flex items-center justify-center bg-neutral-dark border border-secondary/30 active:scale-90">
                     <span class="material-symbols-outlined text-secondary">menu_book</span>
-                </button>
-                <button onclick="switchScreen('settings')" class="w-10 h-10 rounded-full flex items-center justify-center bg-neutral-dark premium-border active:scale-90">
-                    <span class="material-symbols-outlined text-primary">settings</span>
                 </button>
             </div>
         </header>
@@ -74,7 +70,7 @@
                 </div>
                 <div class="flex flex-col items-center gap-2">
                     <button onclick="sendSalesData()" class="w-full py-5 gold-gradient rounded-2xl text-background-dark font-black text-lg active:scale-95 shadow-lg">売上を送信する</button>
-                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">v1.46 Final Secure</span>
+                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">v1.46 Final No-Login</span>
                 </div>
             </div>
         </footer>
@@ -86,6 +82,7 @@
             <h1 class="text-xl font-extrabold text-secondary uppercase">売上帳簿</h1>
         </header>
         <main class="p-4 max-w-md mx-auto space-y-6 text-left">
+            <p class="text-[10px] text-slate-400 px-2">※履歴の閲覧にはGAS側のパスワード設定が本来必要です</p>
             <div class="bg-neutral-dark p-4 rounded-xl border border-white/5">
                 <select id="year-selector" onchange="refreshHistory()" class="w-full bg-background-dark border border-white/10 rounded-lg px-3 py-2 text-white font-bold outline-none">
                     <option value="2025">2025年度</option><option value="2026" selected>2026年度</option><option value="2027">2027年度</option>
@@ -114,8 +111,8 @@
 </div>
 
 <script>
-    const VERSION = "v1.46";
-    let lastPass = ""; 
+    const VERSION = "v1.46-nologin";
+    let lastPass = "no_auth"; // 認証なし用のダミー値
 
     const DEFAULT_STATE = {
         version: VERSION,
@@ -129,6 +126,7 @@
 
     let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 
+    // ロック画面を飛ばして直接メインを描画
     function init() {
         const saved = localStorage.getItem('salon_pos_final_data');
         if (saved) {
@@ -136,41 +134,15 @@
             state = { ...state, ...parsed, selectedItems: [] };
         }
         
-        const today = new Date().toLocaleDateString();
-        const lastAuth = localStorage.getItem('last_auth_date');
-        lastPass = localStorage.getItem('cached_pass') || "";
-
-        if (lastAuth === today && lastPass) {
-            renderMain();
-        } else {
-            document.getElementById('lock-screen').classList.remove('hidden');
-        }
+        // 認証チェックを行わず、メイン画面を表示
+        document.getElementById('lock-screen').classList.add('hidden');
+        renderMain();
     }
 
+    // ロック解除関数（念のため中身を空にして残す）
     async function checkAppLock() {
-        const pass = document.getElementById('app-password').value;
-        if (!pass) return;
-        if (!state.gasUrl) return alert("URL未設定。設定画面へは入れません。");
-
-        try {
-            const res = await fetch(state.gasUrl, { method: 'POST', body: JSON.stringify({ action: 'fetch', password: pass, year: new Date().getFullYear().toString() }) });
-            const data = await res.json();
-            if (data.error) return alert("パスワードが違います");
-
-            lastPass = pass;
-            localStorage.setItem('cached_pass', pass);
-            localStorage.setItem('last_auth_date', new Date().toLocaleDateString());
-            document.getElementById('lock-screen').classList.add('hidden');
-            renderMain();
-        } catch (e) { alert("認証エラー。GAS URLを確認してください。"); }
-    }
-
-    function logout() {
-        if(confirm('ログアウトしてロック画面に戻りますか？')) {
-            localStorage.removeItem('cached_pass');
-            localStorage.removeItem('last_auth_date');
-            location.reload(); 
-        }
+        document.getElementById('lock-screen').classList.add('hidden');
+        renderMain();
     }
 
     function renderMain() {
@@ -215,20 +187,29 @@
     async function sendSalesData() {
         if (!state.selectedItems.length || !state.gasUrl) return alert("URL未設定/項目未選択");
         const payload = { timestamp: new Date().toLocaleString('ja-JP'), items: state.selectedItems.map(i => i.name).join(','), total: state.selectedItems.reduce((s,i)=>s+i.price,0) };
-        try { await fetch(state.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }); alert("売上を送信しました"); resetSelection(); } catch(e) { alert("送信エラー"); }
+        try { 
+            // no-cors のままでも送信はされますが、結果は取得できません
+            await fetch(state.gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) }); 
+            alert("売上送信コマンドを送信しました"); 
+            resetSelection(); 
+        } catch(e) { alert("送信エラー"); }
     }
 
-    function openHistoryWithAuth() { refreshHistory(); }
+    function openHistoryWithAuth() { 
+        if (!state.gasUrl) return alert("URLが設定されていません");
+        refreshHistory(); 
+    }
 
     async function refreshHistory() {
         const year = document.getElementById('year-selector').value;
         try {
+            // GAS側でパスワード必須にしている場合、ここはエラーになります
             const res = await fetch(state.gasUrl, { method: 'POST', body: JSON.stringify({ action: 'fetch', password: lastPass, year: year }) });
             const data = await res.json();
-            if (data.error) return alert(data.error);
+            if (data.error) return alert("履歴の取得に失敗しました（GAS側でパスワード認証が必要です）");
             renderHistory(data.summary, lastPass);
             switchScreen('history');
-        } catch (e) { alert("履歴取得失敗"); }
+        } catch (e) { alert("履歴取得失敗: GAS URLまたは認証設定を確認してください"); }
     }
 
     function renderHistory(summary, pass) {
@@ -251,11 +232,14 @@
             document.getElementById('details-title').textContent = month + " 詳細";
             list.innerHTML = data.details.map(d => `<div class="flex justify-between p-4 bg-neutral-dark border border-white/5 rounded-lg text-xs"><span class="text-slate-400">${d.date}</span><span class="font-bold text-white tracking-widest">¥${d.price.toLocaleString()}</span></div>`).join('');
             document.getElementById('history-details').classList.remove('hidden');
-        } catch (e) { alert("詳細エラー"); }
+        } catch (e) { alert("詳細データの取得に失敗しました"); }
     }
 
     function switchScreen(screen) {
-        ['main-screen', 'settings-screen', 'history-screen'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['main-screen', 'settings-screen', 'history-screen'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.classList.add('hidden');
+        });
         document.getElementById(screen + '-screen').classList.remove('hidden');
         if (screen === 'main') renderMain();
         if (screen === 'settings') renderSettings();
